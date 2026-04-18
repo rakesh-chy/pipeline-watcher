@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pipeline-watcher status</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+  :root { --bg:#0e1116; --card:#151a21; --muted:#8b949e; --fg:#e6edf3;
+          --ok:#3fb950; --warn:#d29922; --crit:#f85149; --border:#30363d; }
+  * { box-sizing: border-box; }
+  body { margin:0; font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+         background:var(--bg); color:var(--fg); }
+  header { padding:1.5rem 2rem; border-bottom:1px solid var(--border); display:flex; align-items:baseline; gap:1rem; }
+  header h1 { margin:0; font-size:1.25rem; font-weight:600; }
+  header .meta { color:var(--muted); font-size:.9rem; }
+  main { padding: 1.5rem 2rem; max-width: 1100px; margin: 0 auto; }
+  .summary { display:flex; gap:1rem; margin-bottom:1.5rem; }
+  .pill { padding:.4rem .75rem; border-radius:999px; background:var(--card); border:1px solid var(--border);
+          font-size:.85rem; color:var(--muted); }
+  .pill.ok { color:var(--ok); border-color:var(--ok); }
+  .pill.crit { color:var(--crit); border-color:var(--crit); }
+  table { width:100%; border-collapse: collapse; background:var(--card); border:1px solid var(--border);
+          border-radius:8px; overflow:hidden; }
+  th, td { padding:.75rem 1rem; text-align:left; border-bottom:1px solid var(--border); font-size:.9rem; vertical-align: top; }
+  th { background: #1a2029; color: var(--muted); font-weight:500; text-transform: uppercase; letter-spacing:.05em; font-size:.75rem; }
+  tr:last-child td { border-bottom: none; }
+  .dot { display:inline-block; width:.6rem; height:.6rem; border-radius:50%; margin-right:.4rem; vertical-align: middle; }
+  .dot.ok { background:var(--ok); }
+  .dot.warn { background:var(--warn); }
+  .dot.crit { background:var(--crit); }
+  code { background:#1a2029; padding:.1rem .3rem; border-radius:3px; font-size:.85rem; }
+  .check { display:flex; gap:.4rem; align-items:center; margin:.15rem 0; color:var(--muted); }
+  .check.breaching { color:var(--fg); }
+  footer { padding:1.5rem 2rem; color:var(--muted); font-size:.8rem; }
+</style>
+</head>
+<body>
+<header>
+  <h1>pipeline-watcher</h1>
+  <span class="meta">SLA monitor | {{ rows | length }} pipelines</span>
+</header>
+<main>
+  <div class="summary">
+    {% set unhealthy = rows | rejectattr('healthy') | list | length %}
+    {% if unhealthy == 0 %}
+      <span class="pill ok"><span class="dot ok"></span>All pipelines healthy</span>
+    {% else %}
+      <span class="pill crit"><span class="dot crit"></span>{{ unhealthy }} unhealthy</span>
+    {% endif %}
+    <span class="pill">{{ open_incidents | length }} open incidents</span>
+    <span class="pill">refreshed {{ now.strftime('%Y-%m-%d %H:%M:%S UTC') }}</span>
+  </div>
+
+  <table>
+    <thead>
+    <tr>
+      <th></th>
+      <th>Pipeline</th>
+      <th>Owner</th>
+      <th>Last heartbeat</th>
+      <th>Checks</th>
+    </tr>
+    </thead>
+    <tbody>
+    {% for row in rows %}
+    <tr>
+      <td>
+        {% if row.healthy %}
+          <span class="dot ok"></span>
+        {% else %}
+          {% set sev = (row.results | selectattr('breaching') | map(attribute='severity') | list) %}
+          {% set sev_str = sev[0].value if sev else 'warn' %}
+          <span class="dot {{ 'crit' if sev_str == 'critical' else 'warn' }}"></span>
+        {% endif %}
+      </td>
+      <td>
+        <code>{{ row.pipeline.name }}</code>
+        {% if row.pipeline.description %}<div style="color:var(--muted);font-size:.8rem;margin-top:.2rem">{{ row.pipeline.description }}</div>{% endif %}
+      </td>
+      <td>{{ row.pipeline.owner or '-' }}</td>
+      <td>
+        {% if row.last %}
+          {{ row.last.ts | humanize_age }}
+          <div style="color:var(--muted);font-size:.75rem">{{ row.last.status }}</div>
+        {% else %}
+          <span style="color:var(--muted)">never</span>
+        {% endif %}
+      </td>
+      <td>
+        {% for r in row.results %}
+          <div class="check {{ 'breaching' if r.breaching }}">
+            {% if r.breaching %}
+              <span class="dot {{ 'crit' if r.severity.value == 'critical' else 'warn' }}"></span>
+            {% else %}
+              <span class="dot ok"></span>
+            {% endif %}
+            <code>{{ r.kind.value }}</code>
+            <span>{{ r.detail }}</span>
+          </div>
+        {% endfor %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</main>
+<footer>pipeline-watcher | self-hosted SLA monitor</footer>
+</body>
+</html>
