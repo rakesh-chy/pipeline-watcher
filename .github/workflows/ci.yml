@@ -1,0 +1,39 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: watcher
+          POSTGRES_PASSWORD: watcher
+          POSTGRES_DB: watcher_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U watcher -d watcher_test"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      WATCHER_TEST_DATABASE_URL: postgresql://watcher:watcher@localhost:5432/watcher_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+      - name: Install
+        run: pip install -e ".[dev]"
+      - name: Lint
+        run: ruff check src tests
+      - name: Test
+        run: pytest -v
