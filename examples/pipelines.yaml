@@ -1,0 +1,22 @@
+pipelines:
+  - name: orders-etl
+    description: Hourly ETL of orders into the warehouse
+    expected_interval_seconds: 3600
+    owner: data-platform
+
+  - name: user-events-stream
+    description: 5-minute micro-batch of clickstream events
+    expected_interval_seconds: 600
+    failure_rate_threshold: 0.3
+    owner: growth
+
+  - name: nightly-aggregations
+    description: Nightly rollup of derived tables
+    expected_interval_seconds: 86400
+    owner: analytics
+
+  - name: status-page-mirror
+    description: Mirrors a public status JSON; freshness-checked
+    expected_interval_seconds: 900
+    freshness_url: https://www.githubstatus.com/api/v2/status.json
+    owner: ops
